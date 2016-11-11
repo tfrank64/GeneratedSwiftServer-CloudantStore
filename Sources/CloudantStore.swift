@@ -4,7 +4,7 @@ import SwiftyJSON
 import KituraNet
 import GeneratedSwiftServer
 
-class CloudantStore: Store {
+public class CloudantStore: Store {
     struct CloudantStoreID: ModelID {
         let value: String
 
@@ -28,13 +28,13 @@ class CloudantStore: Store {
             }
         }
     }
-    static func ID(_ id: Any) throws -> ModelID {
+    public static func ID(_ id: Any) throws -> ModelID {
         return try CloudantStoreID(id)
     }
 
     let client: CouchDBClient
 
-    init(_ connectionProperties: ConnectionProperties) {
+    public init(_ connectionProperties: ConnectionProperties) {
         client = CouchDBClient(connectionProperties: connectionProperties)
     }
 
@@ -76,7 +76,7 @@ class CloudantStore: Store {
     //           * StoreError.notFound(id) - if no entity with the provided id was found in the Store
     //           * StoreError.storeUnavailable(reason) - if the Store is not in a ready state to service queries
     //           * StoreError.internalError - if there is a logic error
-    func findOne(type: Model.Type, id: ModelID, callback: @escaping EntityCallback) throws {
+    public func findOne(type: Model.Type, id: ModelID, callback: @escaping EntityCallback) throws {
         guard let cloudantID = id as? CloudantStoreID else {
             // TODO(tunniclm): This failure path may go away if Store
             // is made generic over ModelID
@@ -143,7 +143,7 @@ class CloudantStore: Store {
     //           Error types:
     //           * StoreError.storeUnavailable(reason) - if the Store is not in a ready state to service queries
     //           * StoreError.internalError - if there is a logic error
-    func findAll(type: Model.Type, callback: @escaping EntitiesCallback) {
+    public func findAll(type: Model.Type, callback: @escaping EntitiesCallback) {
         database(type).retrieveAll(includeDocuments: true) { maybeDocuments, error in
             if let error = error {
                 if error.code == Database.InternalError {
@@ -204,7 +204,7 @@ class CloudantStore: Store {
     //           * StoreError.internalError - if there is a logic error
     // TODO(tunniclm): Provide a mechanism for differentiating between .internalErrors that prevented document creation,
     //                 versus .internalErrors where the document was created but couldn't be interpreted.
-    func create(type: Model.Type, id: ModelID?, entity: [String:Any], callback: @escaping EntityCallback) throws {
+    public func create(type: Model.Type, id: ModelID?, entity: [String:Any], callback: @escaping EntityCallback) throws {
         var modifiedEntity = entity
         modifiedEntity.removeValue(forKey: "id")
         if let id = id {
@@ -274,7 +274,7 @@ class CloudantStore: Store {
     //           * StoreError.internalError - if there is a logic error
     // TODO(tunniclm): Provide a mechanism for differentiating between .internalErrors that prevented document creation,
     //                 versus .internalErrors where the document was created but couldn't be interpreted.
-    func update(type: Model.Type, id: ModelID, entity: [String:Any], callback: @escaping EntityCallback) throws {
+    public func update(type: Model.Type, id: ModelID, entity: [String:Any], callback: @escaping EntityCallback) throws {
         guard let cloudantID = id as? CloudantStoreID else {
             throw StoreError.idInvalid(id)
         }
@@ -376,7 +376,7 @@ class CloudantStore: Store {
     //           * StoreError.notFound(id) - if no entity with the provided id was found in the Store
     //           * StoreError.storeUnavailable(reason) - if the Store is not in a ready state to service queries
     //           * StoreError.internalError - if there is a logic error
-    func delete(type: Model.Type, id: ModelID, callback: @escaping EntityCallback) throws {
+    public func delete(type: Model.Type, id: ModelID, callback: @escaping EntityCallback) throws {
         // TODO(tunniclm): Generics might help with this type constraint (make parameter "id: CloudantStoreID").
         guard let cloudantID = id as? CloudantStoreID else {
             // TODO(tunniclm): This failure path may go away if Store
