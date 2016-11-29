@@ -256,6 +256,8 @@ public class CloudantStore: Store {
         }
     }
 
+    // update
+    //
     // throws:
     //   StoreError.idInvalid(id) - if an id is provided and it is not compatible
     // passes to callback:
@@ -278,7 +280,7 @@ public class CloudantStore: Store {
         guard let cloudantID = id as? CloudantStoreID else {
             throw StoreError.idInvalid(id)
         }
-        let newId = try entity["id"].map { try CloudantStoreID($0) }
+        let newID = try entity["id"].map { try CloudantStoreID($0) }
 
         // TODO since we only want the revision, could we just use a HEAD request?
         // I don't think Kitura-CouchDB supports this right now though
@@ -299,7 +301,7 @@ public class CloudantStore: Store {
             var modifiedEntity = existingEntity
             CloudantStore.mergeDictionary(&modifiedEntity, merge: entity)
             modifiedEntity.removeValue(forKey: "id")
-            self.update_(type: type, id: cloudantID, rev: existingRev, newId: newId, entity: modifiedEntity, callback: callback)
+            self.update_(type: type, id: cloudantID, rev: existingRev, newID: newID, entity: modifiedEntity, callback: callback)
         }
     }
 
@@ -307,8 +309,8 @@ public class CloudantStore: Store {
     // - existing document with valid rev and id read from db
     // - partial updates already merged into the existing entity
     // - "id" is removed from entity (if exists) and passed as newId
-    private func update_(type: Model.Type, id: CloudantStoreID, rev: String, newId: CloudantStoreID?, entity: [String:Any], callback: @escaping ([String:Any]?, StoreError?) -> Void) {
-        if newId != nil && newId!.value != id.value {
+    private func update_(type: Model.Type, id: CloudantStoreID, rev: String, newID: CloudantStoreID?, entity: [String:Any], callback: @escaping ([String:Any]?, StoreError?) -> Void) {
+        if newID != nil && newID!.value != id.value {
             // NOTE(tunniclm): Need to change the id of the document
             callback(nil, .internalError("Changing id is not supported"))
             return
@@ -362,6 +364,54 @@ public class CloudantStore: Store {
                 }
                 callback(result?.0, error)
             }
+        }
+    }
+
+    // replace
+    //
+    // throws:
+    //   StoreError.idInvalid(id) - if an id is provided and it is not compatible
+    // passes to callback:
+    // * resultEntity - the entity with an additional key "id" and value of type CloudantStoreID encapsulating
+    //                  the docid the entity was stored against. Will be nil if, and only if, there was an error.
+    // * error - the error that occurred or nil if no error occurred.
+    //           If an error occurs, the document will not be updated (exception: if it is an .internalError then
+    //           the document may still be updated).
+    //           Error types:
+    //           * StoreError.notFound(id) - if no entity with the provided id was found in the Store
+    /// ((idConflict never thrown since we don't support changing ids,
+    //    throws .internalError at the moment -- TODO fix that!
+    //           * StoreError.idConflict(id) - if changing the id of the entity and an entity already exists with the provided id
+    /// ))
+    //           * StoreError.storeUnavailable(reason) - if the Store is not in a ready state to service queries
+    //           * StoreError.internalError - if there is a logic error
+    // TODO(tunniclm): Provide a mechanism for differentiating between .internalErrors that prevented document creation,
+    //                 versus .internalErrors where the document was created but couldn't be interpreted.
+    public func replace(type: Model.Type, id: ModelID, entity: [String : Any], callback: @escaping EntityCallback) throws {
+        guard let cloudantID = id as? CloudantStoreID else {
+            throw StoreError.idInvalid(id)
+        }
+        let newID = try entity["id"].map { try CloudantStoreID($0) }
+
+        // TODO since we only want the revision, could we just use a HEAD request?
+        // I don't think Kitura-CouchDB supports this right now though
+        findOne_(type: type, id: cloudantID) { result, error in
+            if let error = error {
+                callback(nil, error)
+                return
+            }
+
+            guard let (_, existingRev) = result else {
+                // NOTE(tunniclm): findOne_() returns a result or an error so we
+                // should not get here.
+                assert(false)
+                callback(nil, .internalError("No error and no result, should have one or the other"))
+                return
+            }
+
+            var resultEntity = entity
+            resultEntity.removeValue(forKey: "id")
+            self.update_(type: type, id: cloudantID, rev: existingRev, newID: newID, entity: resultEntity, callback: callback)
         }
     }
 
